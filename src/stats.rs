@@ -3,11 +3,6 @@ use serde_json::Result;
 use serde_json::{Map, Value};
 use std::fmt::Display;
 
-pub struct Player {
-    pub name: String,
-    pub stats: Stats,
-}
-
 #[derive(Copy, Clone)]
 pub enum StatCategory {
     Mined,
