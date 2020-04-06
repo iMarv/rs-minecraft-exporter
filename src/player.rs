@@ -1,6 +1,7 @@
-use crate::stats::Stats;
+use crate::stats::{NbtStats, Stats};
 use crate::Result;
-use fs::DirEntry;
+use fs::{DirEntry, File};
+use nbt;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::{Mutex, MutexGuard};
@@ -17,10 +18,11 @@ lazy_static! {
 pub struct Player {
     pub name: String,
     pub stats: Stats,
+    pub nbt_stats: NbtStats,
 }
 
 impl Player {
-    pub async fn from_uuid(uuid: String, stats_path: &PathBuf) -> Result<Self> {
+    pub async fn from_uuid(uuid: String, stats_path: &PathBuf, nbt_path: &PathBuf) -> Result<Self> {
         let name = get_player_name(&uuid).await?;
         let file_name = format!("{}.json", uuid);
         let path = stats_path.join(file_name);
@@ -28,7 +30,14 @@ impl Player {
         let stats = fs::read_to_string(path)?;
         let stats = Stats::from(stats)?;
 
-        Ok(Self { name, stats })
+        let nbt_stats = File::open(nbt_path)?;
+        let nbt_stats: NbtStats = nbt::de::from_gzip_reader(nbt_stats)?;
+
+        Ok(Self {
+            name,
+            stats,
+            nbt_stats,
+        })
     }
 }
 
@@ -88,12 +97,13 @@ pub async fn gather_players(base_dir: String) -> Result<Vec<Player>> {
     let mut result: Vec<Player> = vec![];
 
     for entry in playerdata {
-        let entry: DirEntry = entry?;
-        let entry = &entry.file_name();
+        let nbt_file: DirEntry = entry?;
+        let entry = &nbt_file.file_name();
         let entry = Path::new(entry).file_stem();
 
         if let Some(entry) = entry.and_then(|e| e.to_str()) {
-            let p: Result<Player> = Player::from_uuid(String::from(entry), &stats_path).await;
+            let p: Result<Player> =
+                Player::from_uuid(String::from(entry), &stats_path, &nbt_file.path()).await;
 
             match p {
                 Ok(player) => {

@@ -50,3 +50,17 @@ impl Stats {
         self.stats[stat.to_string()].as_object()
     }
 }
+
+#[derive(Debug, Deserialize)]
+pub struct NbtStats {
+    #[serde(alias = "XpTotal")]
+    pub xp_total: f64,
+    #[serde(alias = "XpLevel")]
+    pub xp_level: f64,
+    #[serde(alias = "Score")]
+    pub score: f64,
+    #[serde(alias = "Health")]
+    pub health: f64,
+    #[serde(alias = "foodLevel")]
+    pub food_level: f64,
+}
