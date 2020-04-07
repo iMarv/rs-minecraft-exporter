@@ -4,11 +4,11 @@ use fs::{DirEntry, File};
 use nbt;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::sync::{Mutex, MutexGuard};
 use std::{
     fs,
     path::{Path, PathBuf},
 };
+use tokio::sync::Mutex;
 
 lazy_static! {
     static ref PLAYER_NAMES: Mutex<HashMap<String, String>> = { Mutex::new(HashMap::new()) };
@@ -49,22 +49,18 @@ struct NameResponse {
 }
 
 async fn get_player_name(uuid: &String) -> Result<String> {
-    if let Ok(names) = PLAYER_NAMES.lock() {
-        let mut names: MutexGuard<HashMap<String, String>> = names;
+    let mut names = PLAYER_NAMES.lock().await;
 
-        if let Some(name) = names.get(uuid) {
-            trace!("Got name from cache for {}", uuid);
-            Ok(name.clone())
-        } else if let Ok(name) = fetch_player_name(uuid).await {
-            names.insert(uuid.clone(), name.clone());
-            Ok(name)
-        } else {
-            error!("No name found for UUID {}", uuid);
-            Err("Name not found")?
-        }
+    if let Some(name) = names.get(uuid) {
+        trace!("Got name from cache for {}", uuid);
+        Ok(name.clone())
+    } else if let Ok(name) = fetch_player_name(uuid).await {
+        info!("Fetched name from api for {}", uuid);
+        names.insert(uuid.clone(), name.clone());
+        Ok(name)
     } else {
-        warn!("Name cache locked, fetching from API");
-        fetch_player_name(uuid).await
+        error!("No name found for UUID {}", uuid);
+        Err("Name not found")?
     }
 }
 
@@ -88,8 +84,7 @@ async fn fetch_player_name(uuid: &String) -> Result<String> {
     }
 }
 
-pub async fn gather_players(base_dir: String) -> Result<Vec<Player>> {
-    let base_path = Path::new(&base_dir);
+pub async fn gather_players(base_path: &Path) -> Result<Vec<Player>> {
     let playerdata_path = base_path.join(Path::new("playerdata"));
     let stats_path = base_path.join(Path::new("stats"));
 

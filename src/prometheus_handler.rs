@@ -1,5 +1,5 @@
 use crate::{player::Player, stats::StatCategory};
-use prometheus::{labels, opts, Counter, Encoder, Registry, TextEncoder};
+use prometheus::{Counter, Registry};
 use std::collections::HashMap;
 
 pub fn track_for_player(player: &Player, registry: &Registry) {
@@ -82,9 +82,10 @@ fn track_playerstat(player: &Player, stat: StatCategory, registry: &Registry) {
             register_stat(registry, &name, &help, value, &player.name, Some(&key));
         }
     } else {
-        info!(
+        trace!(
             "Missing category `{}` for player `{}`",
-            stat_str, player.name
+            stat_str,
+            player.name
         );
     }
 }
@@ -113,15 +114,4 @@ fn register_stat(
 
 fn remove_prefix(property: &String) -> String {
     property[10..].to_string()
-}
-
-pub fn print_metrics(registry: Registry) {
-    // Gather the metrics.
-    let mut buffer = vec![];
-    let encoder = TextEncoder::new();
-    let metric_families = registry.gather();
-    encoder.encode(&metric_families, &mut buffer).unwrap();
-
-    // Output to the standard output.
-    println!("{}", String::from_utf8(buffer).unwrap());
 }

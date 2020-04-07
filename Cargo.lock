@@ -777,6 +777,7 @@ name = "rs-minecraft-exporter"
 version = "0.1.0"
 dependencies = [
  "hematite-nbt",
+ "hyper",
  "lazy_static",
  "log",
  "prometheus",
