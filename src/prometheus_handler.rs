@@ -2,6 +2,32 @@ use crate::{player::Player, stats::StatCategory};
 use prometheus::{Counter, Registry};
 use std::collections::HashMap;
 
+macro_rules! local_register_counter {
+    // Multiple stats at once
+    ($reg:expr, $p_name:expr,
+        $( [$s_name:expr, $help:expr, $val:expr $(, $s_type:expr)?] )+
+    ) => {
+        $(
+            // Matcher for self, single stat version
+            local_register_counter!($reg, $s_name, $help, $val, $p_name $(, $s_type:expr)?);
+        )+
+    };
+    // One stat
+    ( $reg:expr, $s_name:expr, $help:expr, $val:expr, $p_name:expr $(, $s_type:expr)? )  => {
+        let labels: HashMap<&str, &String> = labels!(
+            "player" => $p_name,
+            $(
+                "type" => $s_type,
+            )?
+        );
+
+        let counter = Counter::with_opts(opts!(&String::from($s_name), &String::from($help), labels)).unwrap();
+        counter.inc_by($val);
+
+        $reg.register(Box::new(counter)).unwrap();
+    };
+}
+
 pub fn track_for_player(player: &Player, registry: &Registry) {
     for metric in [
         StatCategory::Broken,
@@ -23,50 +49,39 @@ pub fn track_for_player(player: &Player, registry: &Registry) {
 }
 
 fn track_nbt_stat(player: &Player, registry: &Registry) {
-    // XpTotal
-    register_stat(
+    local_register_counter!(
         registry,
-        &String::from("mc_xp_total"),
-        &String::from("total collected xp"),
-        player.nbt_stats.xp_total,
         &player.name,
-        None,
-    );
-    // XpLevel
-    register_stat(
-        registry,
-        &String::from("mc_xp_level"),
-        &String::from("current player level"),
-        player.nbt_stats.xp_level,
-        &player.name,
-        None,
-    );
-    // Score
-    register_stat(
-        registry,
-        &String::from("mc_score"),
-        &String::from("current player score"),
-        player.nbt_stats.score,
-        &player.name,
-        None,
-    );
-    // Health
-    register_stat(
-        registry,
-        &String::from("mc_health"),
-        &String::from("current player health"),
-        player.nbt_stats.health,
-        &player.name,
-        None,
-    );
-    // foodLevel
-    register_stat(
-        registry,
-        &String::from("mc_food_level"),
-        &String::from("current player food level"),
-        player.nbt_stats.health,
-        &player.name,
-        None,
+        [
+            // XpTotal
+            "mc_xp_total",
+            "total collceted xp",
+            player.nbt_stats.xp_total
+        ]
+        [
+            // XpLevel
+            "mc_xp_level",
+            "current player level",
+            player.nbt_stats.xp_level
+        ]
+        [
+            // Score
+            "mc_score",
+            "current player score",
+            player.nbt_stats.score
+        ]
+        [
+            // Health
+            "mc_health",
+            "current player health",
+            player.nbt_stats.health
+        ]
+        [
+            // foodLevel
+            "mc_food_level",
+            "current player food level",
+            player.nbt_stats.food_level
+        ]
     );
 }
 
@@ -79,7 +94,7 @@ fn track_playerstat(player: &Player, stat: StatCategory, registry: &Registry) {
         for (key, value) in stats.iter() {
             let value = value.as_f64().expect("Property value not a number");
 
-            register_stat(registry, &name, &help, value, &player.name, Some(&key));
+            local_register_counter!(registry, &name, &help, value, &player.name, &key);
         }
     } else {
         trace!(
@@ -88,28 +103,6 @@ fn track_playerstat(player: &Player, stat: StatCategory, registry: &Registry) {
             player.name
         );
     }
-}
-
-fn register_stat(
-    registry: &Registry,
-    stat_name: &String,
-    help: &String,
-    value: f64,
-    player_name: &String,
-    stat_type: Option<&String>,
-) {
-    let mut labels: HashMap<&str, &String> = labels!(
-        "player" => player_name,
-    );
-
-    if let Some(stat_type) = stat_type {
-        labels.insert("type", stat_type);
-    }
-
-    let counter = Counter::with_opts(opts!(stat_name, help, labels)).unwrap();
-    counter.inc_by(value);
-
-    registry.register(Box::new(counter.clone())).unwrap();
 }
 
 fn remove_prefix(property: &String) -> String {
