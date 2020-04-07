@@ -17,3 +17,8 @@ reqwest = { version = "0.10", features = ["json"] }
 tokio = { version = "0.2", features = ["full"] }
 lazy_static = "1.4.0"
 hyper = "0.13.4"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = 'abort'

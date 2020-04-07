@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
     let (path, log_level) = handle_args(args)?;
     simple_logger::init_with_level(log_level)?;
 
-    let addr = ([127, 0, 0, 1], 9898).into();
+    let addr = ([0, 0, 0, 0], 8000).into();
     info!("Listening on http://{}", addr);
 
     let make_svc = make_service_fn(move |_| {
@@ -63,25 +63,26 @@ fn handle_args(args: Vec<String>) -> Result<(PathBuf, log::Level)> {
     match args.len() {
         0 => Err("No arguments given")?,
         1 => {
-            let path = check_path(args.get(0).unwrap().clone());
+            let path = check_path(args.get(0).unwrap().clone())?;
             Ok((path, log::Level::Info))
         }
         2 | _ => {
-            let path = check_path(args.get(0).unwrap().clone());
-            let level = log::Level::from_str(args.get(1).unwrap());
+            let path = check_path(args.get(0).unwrap().clone())?;
+            let level = args.get(1).unwrap();
+            let level = log::Level::from_str(level).map_err(|_| "Could not parse log level")?;
 
-            Ok((path, level.unwrap_or(log::Level::Trace)))
+            Ok((path, level))
         }
     }
 }
 
-fn check_path(path: String) -> PathBuf {
+fn check_path(path: String) -> Result<PathBuf> {
     let path = PathBuf::from(path);
 
     if path.is_dir() {
-        path
+        Ok(path)
     } else {
-        panic!("Given path is not a directory");
+        Err("Given path is not a directory")?
     }
 }
 
@@ -118,8 +119,6 @@ async fn serve_req(path: &Path) -> std::result::Result<Response<Body>, hyper::Er
 
 async fn gather_metrics(registry: &Registry, path: &Path) -> Result<()> {
     let players = gather_players(path).await?;
-    // Each run needs its own registry as we just map the stats rather
-    // than actually upping any counters
 
     for player in &players {
         track_for_player(&player, registry);
