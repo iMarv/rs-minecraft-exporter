@@ -3,6 +3,18 @@ use serde_json::Result;
 use serde_json::{Map, Value};
 use std::fmt::Display;
 
+pub const STAT_CATEGORIES: [StatCategory; 9] = [
+    StatCategory::Mined,
+    StatCategory::Crafted,
+    StatCategory::Broken,
+    StatCategory::Custom,
+    StatCategory::PickedUp,
+    StatCategory::KilledBy,
+    StatCategory::Used,
+    StatCategory::Dropped,
+    StatCategory::Killed,
+];
+
 #[derive(Copy, Clone)]
 pub enum StatCategory {
     Mined,
@@ -46,7 +58,7 @@ impl Stats {
         Ok(stats)
     }
 
-    pub fn get_stat(&self, stat: StatCategory) -> Option<&Map<String, Value>> {
+    pub fn get_stat(&self, stat: &StatCategory) -> Option<&Map<String, Value>> {
         self.stats[stat.to_string()].as_object()
     }
 }

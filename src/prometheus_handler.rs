@@ -1,4 +1,4 @@
-use crate::{player::Player, stats::StatCategory};
+use crate::{player::Player, stats::STAT_CATEGORIES};
 use prometheus::{Counter, Registry};
 use std::collections::HashMap;
 
@@ -29,22 +29,7 @@ macro_rules! local_register_counter {
 }
 
 pub fn track_for_player(player: &Player, registry: &Registry) {
-    for metric in [
-        StatCategory::Broken,
-        StatCategory::Crafted,
-        StatCategory::Custom,
-        StatCategory::Dropped,
-        StatCategory::Killed,
-        StatCategory::KilledBy,
-        StatCategory::Mined,
-        StatCategory::PickedUp,
-        StatCategory::Used,
-    ]
-    .iter()
-    {
-        track_playerstat(player, *metric, registry);
-    }
-
+    track_playerstats(player, registry);
     track_nbt_stat(player, registry);
 }
 
@@ -85,26 +70,28 @@ fn track_nbt_stat(player: &Player, registry: &Registry) {
     );
 }
 
-fn track_playerstat(player: &Player, stat: StatCategory, registry: &Registry) {
-    let stat_str = remove_prefix(&stat.to_string());
-    let name = format!("mc_{}", stat_str);
-    let help = format!("collected stats for category `{}`", stat_str);
+fn track_playerstats(player: &Player, registry: &Registry) {
+    for stat in STAT_CATEGORIES.iter() {
+        let stat_str = {
+            let s = &stat.to_string();
+            s[10..].to_string()
+        };
 
-    if let Some(stats) = player.stats.get_stat(stat) {
-        for (key, value) in stats.iter() {
-            let value = value.as_f64().expect("Property value not a number");
+        let name = format!("mc_{}", stat_str);
+        let help = format!("collected stats for category `{}`", stat_str);
 
-            local_register_counter!(registry, &name, &help, value, &player.name, &key);
+        if let Some(stats) = player.stats.get_stat(stat) {
+            for (key, value) in stats.iter() {
+                let value = value.as_f64().expect("Property value not a number");
+
+                local_register_counter!(registry, &name, &help, value, &player.name, &key);
+            }
+        } else {
+            trace!(
+                "Missing category `{}` for player `{}`",
+                stat_str,
+                player.name
+            );
         }
-    } else {
-        trace!(
-            "Missing category `{}` for player `{}`",
-            stat_str,
-            player.name
-        );
     }
-}
-
-fn remove_prefix(property: &String) -> String {
-    property[10..].to_string()
 }
