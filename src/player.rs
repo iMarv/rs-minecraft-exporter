@@ -55,7 +55,7 @@ async fn get_player_name(uuid: &String) -> Result<String> {
         trace!("Got name from cache for {}", uuid);
         Ok(name.clone())
     } else if let Ok(name) = fetch_player_name(uuid).await {
-        info!("Fetched name from api for {}", uuid);
+        info!("Fetched name `{}` from api for id {}", name, uuid);
         names.insert(uuid.clone(), name.clone());
         Ok(name)
     } else {
