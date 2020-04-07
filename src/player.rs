@@ -27,11 +27,15 @@ impl Player {
         let file_name = format!("{}.json", uuid);
         let path = stats_path.join(file_name);
 
-        let stats = fs::read_to_string(path)?;
-        let stats = Stats::from(stats)?;
+        let stats = {
+            let s = fs::read_to_string(path)?;
+            Stats::from(s)?
+        };
 
-        let nbt_stats = File::open(nbt_path)?;
-        let nbt_stats: NbtStats = nbt::de::from_gzip_reader(nbt_stats)?;
+        let nbt_stats = {
+            let n = File::open(nbt_path)?;
+            nbt::de::from_gzip_reader(n)?
+        };
 
         Ok(Self {
             name,
@@ -54,7 +58,7 @@ async fn get_player_name(uuid: &String) -> Result<String> {
     if let Some(name) = names.get(uuid) {
         trace!("Got name from cache for {}", uuid);
         Ok(name.clone())
-    } else if let Ok(name) = fetch_player_name(uuid).await {
+    } else if let Ok(name) = fetch_from_mojang(uuid).await {
         info!("Fetched name `{}` from api for id {}", name, uuid);
         names.insert(uuid.clone(), name.clone());
         Ok(name)
@@ -64,7 +68,7 @@ async fn get_player_name(uuid: &String) -> Result<String> {
     }
 }
 
-async fn fetch_player_name(uuid: &String) -> Result<String> {
+async fn fetch_from_mojang(uuid: &String) -> Result<String> {
     trace!("Fetching name from API for {}", uuid);
 
     let url = format!(
@@ -85,10 +89,12 @@ async fn fetch_player_name(uuid: &String) -> Result<String> {
 }
 
 pub async fn gather_players(base_path: &Path) -> Result<Vec<Player>> {
-    let playerdata_path = base_path.join(Path::new("playerdata"));
     let stats_path = base_path.join(Path::new("stats"));
 
-    let playerdata = fs::read_dir(playerdata_path)?;
+    let playerdata = {
+        let p = base_path.join(Path::new("playerdata"));
+        fs::read_dir(p)?
+    };
     let mut result: Vec<Player> = vec![];
 
     for entry in playerdata {
@@ -97,10 +103,10 @@ pub async fn gather_players(base_path: &Path) -> Result<Vec<Player>> {
         let entry = Path::new(entry).file_stem();
 
         if let Some(entry) = entry.and_then(|e| e.to_str()) {
-            let p: Result<Player> =
+            let player: Result<Player> =
                 Player::from_uuid(String::from(entry), &stats_path, &nbt_file.path()).await;
 
-            match p {
+            match player {
                 Ok(player) => {
                     result.push(player);
                 }
