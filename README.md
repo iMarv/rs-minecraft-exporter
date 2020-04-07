@@ -18,6 +18,13 @@ docker run -p 8000:8000 \
 rs-minecraft-exporter /opt/server/world
 ```
 
+### Changing IP to listen to
+
+If you only want to expose metrics inside a private network or similar, you can change the ip the webserver is listening on.
+This can be done by setting the environment variable `HOST_IP` to the desired ip.
+
+If not set, the server will default to `0.0.0.0`.
+
 ### Log Level
 
 You can adjust the log level by appending any of the following strings as an argument to either the docker command or the binary.
