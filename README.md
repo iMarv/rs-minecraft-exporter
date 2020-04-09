@@ -85,4 +85,22 @@ rs-minecraft-exporter /opt/server/world debug
 
 # HELP mc_xp_total total collected xp
 # TYPE mc_xp_total counter
+
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
 ```

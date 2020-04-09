@@ -4,7 +4,7 @@ use hyper::{
     Body, Response, Server,
 };
 use player::gather_players;
-use prometheus::{Encoder, Registry, TextEncoder};
+use prometheus::{process_collector::ProcessCollector, Encoder, Registry, TextEncoder};
 use prometheus_handler::track_for_player;
 use std::env;
 use std::{
@@ -120,6 +120,9 @@ async fn serve_req(path: &Path) -> std::result::Result<Response<Body>, hyper::Er
 }
 
 async fn gather_metrics(registry: &Registry, path: &Path) -> Result<()> {
+    let pc = ProcessCollector::for_self();
+    registry.register(Box::new(pc))?;
+
     let players = gather_players(path).await?;
 
     for player in &players {
