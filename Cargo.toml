@@ -1,9 +1,9 @@
 [package]
 name = "rs-minecraft-exporter"
-version = "1.1.1"
+version = "1.1.2"
 authors = ["Marvin Altemeier <marv.internetz@gmail.com>"]
 edition = "2018"
-license-file = "LICENSE"
+license = "MIT"
 description = "Prometheus exporter for minecraft version 1.15.2+"
 homepage = "https://github.com/iMarv/rs-minecraft-exporter"
 repository = "https://github.com/iMarv/rs-minecraft-exporter"
@@ -11,12 +11,15 @@ readme = "README.md"
 keywords = ["minecraft", "prometheus", "exporter", "nbt", "stats"]
 categories = ["command-line-utilities", "data-structures", "web-programming::http-server", "games"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "rs-minecraft-exporter"
+test = false
+bench = false
 
 [dependencies]
 prometheus = { version = "0.8", features = ["process"] }
-serde_json = "1.0.50"
-serde = { version = "1.0.50", features = ["derive"] }
+serde_json = "1.0.51"
+serde = { version = "1.0.106", features = ["derive"] }
 log = "0.4.8"
 simple_logger = "1.6.0"
 hematite-nbt = "0.4.1"

@@ -1,5 +1,7 @@
 # rs-minecraft-exporter
 
+[![](http://meritbadge.herokuapp.com/rs-minecraft-exporter)](https://crates.io/crates/rs-minecraft-exporter)
+
 This is a shameless rust-plug of [joshi425/minecraft-exporter](https://github.com/Joshi425/minecraft-exporter) for minecraft 1.15.2+.
 
 ## Usage
@@ -13,6 +15,15 @@ docker run -p 8000:8000 \
 ```
 
 ### Binary
+
+Either clone the repository and build the project yourself with cargo or install it through crates.io with
+
+```
+cargo install rs-minecraft-exporter
+```
+
+then simply run
+
 
 ```
 rs-minecraft-exporter /opt/server/world
