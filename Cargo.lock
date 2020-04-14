@@ -829,7 +829,7 @@ checksum = "cabe4fa914dec5870285fa7f71f602645da47c486e68486d2b4ceb4a343e90ac"
 
 [[package]]
 name = "rs-minecraft-exporter"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "hematite-nbt",
  "hyper",
