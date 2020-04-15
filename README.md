@@ -1,6 +1,6 @@
 # rs-minecraft-exporter
 
-[![](http://meritbadge.herokuapp.com/rs-minecraft-exporter)](https://crates.io/crates/rs-minecraft-exporter)
+[![Crates.io](https://img.shields.io/crates/v/rs-minecraft-exporter)](https://crates.io/crates/rs-minecraft-exporter)
 
 This is a shameless rust-plug of [joshi425/minecraft-exporter](https://github.com/Joshi425/minecraft-exporter) for minecraft 1.15.2+.
 
