@@ -9,7 +9,7 @@ use prometheus_handler::track_for_player;
 use std::env;
 use std::{
     error,
-    net::IpAddr,
+    net::{IpAddr, SocketAddr},
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -39,6 +39,11 @@ async fn main() -> Result<()> {
 
     let ip = env::var("HOST_IP").unwrap_or(String::from("0.0.0.0"));
     let addr = (ip.parse::<IpAddr>()?, 8000).into();
+
+    run_server(addr, path).await
+}
+
+async fn run_server(addr: SocketAddr, path: PathBuf) -> Result<()> {
     info!("Listening on http://{}", addr);
 
     let make_svc = make_service_fn(move |_| {
