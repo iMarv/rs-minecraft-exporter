@@ -58,8 +58,8 @@ impl Stats {
         Ok(stats)
     }
 
-    pub fn get_stat(&self, stat: &StatCategory) -> Option<&Map<String, Value>> {
-        self.stats[stat.to_string()].as_object()
+    pub fn get_stat(&self, category: &StatCategory) -> Option<&Map<String, Value>> {
+        self.stats[category.to_string()].as_object()
     }
 }
 
