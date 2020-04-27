@@ -16,6 +16,7 @@ lazy_static! {
 
 #[derive(Debug)]
 pub struct Player {
+    pub uuid: String,
     pub name: String,
     pub stats: Stats,
     pub nbt_stats: NbtStats,
@@ -38,6 +39,7 @@ impl Player {
         };
 
         Ok(Self {
+            uuid,
             name,
             stats,
             nbt_stats,
