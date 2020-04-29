@@ -1,66 +1,76 @@
 use crate::{player::Player, stats::StatCategory};
 use prometheus::{default_registry, Counter, Registry};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
-
-lazy_static! {
-    static ref PLAYER_COUNTERS: Mutex<PlayerCache> = { Mutex::new(HashMap::new()) };
-}
 
 type Uuid = String;
 type CategoryTypeCache = HashMap<String, Counter>;
 type CategoryCache = HashMap<StatCategory, CategoryTypeCache>;
 type PlayerCache = HashMap<Uuid, CategoryCache>;
 
-pub struct StatCache {
-    player_cache: PlayerCache,
+struct StatCache {
+    player_cache: Arc<Mutex<PlayerCache>>,
     registry: &'static Registry,
 }
 
+impl Default for StatCache {
+    fn default() -> Self {
+        Self {
+            player_cache: Arc::new(Mutex::new(HashMap::new())),
+            registry: default_registry(),
+        }
+    }
+}
+
 impl StatCache {
-    pub fn set_stat(
+    pub fn new() -> Self {
+        StatCache::default()
+    }
+
+    pub async fn set_stat(
         &self,
         player: &Player,
         category: &StatCategory,
         category_type: &String,
         value: f64,
     ) {
-        if let Some(mut counter) = self.get_counter(player, category, category_type) {
-            counter.inc_by(value - counter.get());
-        };
+        let counter = self.get_counter(player, category, category_type).await;
+        counter.inc_by(value - counter.get());
     }
-}
 
-// Non-mutable
-impl StatCache {
-    pub fn new() -> Self {
-        Self {
-            player_cache: HashMap::new(),
-            registry: default_registry(),
+    async fn get_category_cache(&self, player: &Player) -> CategoryCache {
+        let mut player_cache = self.player_cache.lock().await;
+
+        if !player_cache.contains_key(&player.uuid) {
+            player_cache.insert(player.uuid.clone(), HashMap::new());
         }
+
+        player_cache.get(&player.uuid).unwrap().clone()
     }
 
-    fn get_category_cache(&self, player: &Player) -> Option<&CategoryCache> {
-        self.player_cache.get(&player.uuid)
+    async fn get_type_cache(&self, player: &Player, category: &StatCategory) -> CategoryTypeCache {
+        let mut category_cache = self.get_category_cache(player).await;
+
+        if !category_cache.contains_key(category) {
+            category_cache.insert(category.clone(), HashMap::new());
+        }
+
+        category_cache.get(category).unwrap().clone()
     }
 
-    fn get_type_cache(
-        &self,
-        player: &Player,
-        category: &StatCategory,
-    ) -> Option<&CategoryTypeCache> {
-        self.get_category_cache(player)
-            .and_then(|cache| cache.get(category))
-    }
-
-    pub fn get_counter(
+    pub async fn get_counter(
         &self,
         player: &Player,
         category: &StatCategory,
         category_type: &String,
-    ) -> Option<&Counter> {
-        self.get_type_cache(player, category)
-            .and_then(|cache| cache.get(category_type))
+    ) -> Counter {
+        let category_type_cache = self.get_type_cache(player, category).await;
+
+        if !category_type_cache.contains_key(category_type) {
+            todo!();
+        }
+
+        category_type_cache.get(category_type).unwrap().clone()
     }
 }
 
@@ -109,7 +119,7 @@ mod tests {
             };
 
             StatCache {
-                player_cache,
+                player_cache: Arc::new(Mutex::new(player_cache)),
                 registry: default_registry(),
             }
         }};
@@ -118,8 +128,8 @@ mod tests {
     mod set_stat {
         use super::*;
 
-        #[test]
-        fn should_update_existing_stat() {
+        #[tokio::test]
+        async fn should_update_existing_stat() {
             let player = &mock_player!(1);
             let category = &StatCategory::Crafted;
             let category_type = &String::from("minecraft:testo");
@@ -128,16 +138,15 @@ mod tests {
             let cache = setup_cache!(1, StatCategory::Crafted, category_type, value);
 
             let value = 5.0;
-            cache.set_stat(player, category, category_type, value);
+            cache.set_stat(player, category, category_type, value).await;
 
-            let actual = cache.get_counter(player, category, category_type);
+            let actual = cache.get_counter(player, category, category_type).await;
 
-            assert!(actual.is_some());
-            assert_eq!(actual.unwrap().get(), value);
+            assert_eq!(actual.get(), value);
         }
 
-        #[test]
-        fn should_insert_new_stat() {
+        #[tokio::test]
+        async fn should_insert_new_stat() {
             let cache = setup_cache!(
                 3,
                 StatCategory::Broken,
@@ -149,12 +158,11 @@ mod tests {
             let category_type = &String::from("minecraft:testo");
             let value = 2.0;
 
-            cache.set_stat(player, category, category_type, value);
+            cache.set_stat(player, category, category_type, value).await;
 
-            let actual = cache.get_counter(player, category, category_type);
+            let actual = cache.get_counter(player, category, category_type).await;
 
-            assert!(actual.is_some());
-            assert_eq!(actual.unwrap().get(), value);
+            assert_eq!(actual.get(), value);
         }
     }
 }
