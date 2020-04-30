@@ -74,28 +74,34 @@ rs-minecraft-exporter /opt/server/world debug
 # TYPE mc_dropped counter
 
 # HELP mc_food_level current player food level
-# TYPE mc_food_level counter
+# TYPE mc_food_level gauge
 
 # HELP mc_health current player health
-# TYPE mc_health counter
+# TYPE mc_health gauge
 
 # HELP mc_killed collected stats for category `killed`
 # TYPE mc_killed counter
+
+# HELP mc_killed_by collected stats for category `killed_by`
+# TYPE mc_killed_by counter
+
+# HELP mc_mined collected stats for category `mined`
+# TYPE mc_mined counter
 
 # HELP mc_picked_up collected stats for category `picked_up`
 # TYPE mc_picked_up counter
 
 # HELP mc_score current player score
-# TYPE mc_score counter
+# TYPE mc_score gauge
 
 # HELP mc_used collected stats for category `used`
 # TYPE mc_used counter
 
 # HELP mc_xp_level current player level
-# TYPE mc_xp_level counter
+# TYPE mc_xp_level gauge
 
-# HELP mc_xp_total total collected xp
-# TYPE mc_xp_total counter
+# HELP mc_xp_total total collceted xp
+# TYPE mc_xp_total gauge
 
 # HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
 # TYPE process_cpu_seconds_total counter
