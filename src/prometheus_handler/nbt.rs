@@ -1,46 +1,30 @@
 use crate::player::Player;
-use prometheus::{Gauge, Registry};
-use std::collections::HashMap;
-use tokio::sync::Mutex;
-
-type PlayerName = String;
+use crate::prometheus_handler::stat_cache::STAT_CACHE;
 
 macro_rules! local_register_gauge {
     // Multiple stats at once
-    ($reg:expr, $p_name:expr,
+    ($player:expr,
         $( [$s_name:expr, $help:expr, $val:expr] )+
     ) => {
         $(
             // Matcher for self, single stat version
-            local_register_gauge!($reg, $s_name, $help, $val, $p_name);
+            local_register_gauge!($s_name, $help, $val, $player);
         )+
     };
     // One stat
-    ( $reg:expr, $s_name:expr, $help:expr, $val:expr, $p_name:expr)  => {
-        let labels: HashMap<&str, &String> = labels!(
-            "player" => $p_name,
-        );
-
-        let gauge = Gauge::with_opts(opts!(&String::from($s_name), &String::from($help), labels)).unwrap();
-        gauge.set($val);
-
-        $reg.register(Box::new(gauge)).unwrap();
+    ( $s_name:expr, $help:expr, $val:expr, $player:expr)  => {
+        STAT_CACHE.set_gauge(
+            $player,
+            &String::from($s_name),
+            &String::from($help),
+            $val
+        ).await;
     };
 }
 
-lazy_static! {
-    static ref NBT_GAUGES: Mutex<HashMap<PlayerName, HashMap<String, Gauge>>> =
-        { Mutex::new(HashMap::new()) };
-}
-
-pub fn update_nbt_stat() {
-    todo!();
-}
-
-pub fn register_nbt_stat(player: &Player, registry: &Registry) {
+pub async fn register_nbt_stat(player: &Player) {
     local_register_gauge!(
-        registry,
-        &player.name,
+        player,
         [
             // XpTotal
             "mc_xp_total",
