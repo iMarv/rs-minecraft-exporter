@@ -1,6 +1,6 @@
 [package]
 name = "rs-minecraft-exporter"
-version = "1.1.2"
+version = "1.2.0"
 authors = ["Marvin Altemeier <marv.internetz@gmail.com>"]
 edition = "2018"
 license = "MIT"
