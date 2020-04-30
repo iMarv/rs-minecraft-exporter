@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use serde_json::Result;
 use serde_json::{Map, Value};
+use std::cmp::Eq;
 use std::fmt::Display;
 
 pub const STAT_CATEGORIES: [StatCategory; 9] = [
@@ -15,7 +16,7 @@ pub const STAT_CATEGORIES: [StatCategory; 9] = [
     StatCategory::Killed,
 ];
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub enum StatCategory {
     Mined,
     Crafted,
@@ -63,6 +64,20 @@ impl Stats {
     }
 }
 
+#[macro_export]
+macro_rules! mock_stats {
+    () => {
+        crate::stats::Stats::from(String::from(
+            "{
+               \"stats\": {
+                   \"minecraft:testo\": 42
+               }
+            }",
+        ))
+        .unwrap()
+    };
+}
+
 #[derive(Debug, Deserialize)]
 pub struct NbtStats {
     #[serde(alias = "XpTotal")]
@@ -75,4 +90,17 @@ pub struct NbtStats {
     pub health: f64,
     #[serde(alias = "foodLevel")]
     pub food_level: f64,
+}
+
+#[macro_export]
+macro_rules! mock_nbt {
+    () => {
+        crate::stats::NbtStats {
+            xp_total: 100.0,
+            xp_level: 101.0,
+            score: 102.0,
+            health: 10.0,
+            food_level: 10.0,
+        }
+    };
 }
