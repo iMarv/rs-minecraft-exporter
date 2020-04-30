@@ -4,7 +4,7 @@ use hyper::{
     Body, Response, Server,
 };
 use player::gather_players;
-use prometheus::{process_collector::ProcessCollector, Encoder, Registry, TextEncoder};
+use prometheus::{gather, Encoder, TextEncoder};
 use prometheus_handler::track_for_player;
 use std::env;
 use std::{
@@ -94,14 +94,12 @@ fn check_path(path: String) -> Result<PathBuf> {
 }
 
 async fn serve_req(path: &Path) -> std::result::Result<Response<Body>, hyper::Error> {
-    let registry = Registry::new();
-
-    let response = match gather_metrics(&registry, path).await {
+    let response = match gather_metrics(path).await {
         Ok(_) => {
             // Gather the metrics.
             let mut buffer = vec![];
             let encoder = TextEncoder::new();
-            let metric_families = registry.gather();
+            let metric_families = gather();
             encoder.encode(&metric_families, &mut buffer).unwrap();
 
             Response::builder()
@@ -124,14 +122,11 @@ async fn serve_req(path: &Path) -> std::result::Result<Response<Body>, hyper::Er
     Ok(response)
 }
 
-async fn gather_metrics(registry: &Registry, path: &Path) -> Result<()> {
-    let pc = ProcessCollector::for_self();
-    registry.register(Box::new(pc))?;
-
+async fn gather_metrics(path: &Path) -> Result<()> {
     let players = gather_players(path).await?;
 
     for player in &players {
-        track_for_player(&player, registry);
+        track_for_player(&player).await;
     }
 
     Ok(())
