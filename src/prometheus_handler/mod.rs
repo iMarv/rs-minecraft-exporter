@@ -1,12 +1,12 @@
-use self::nbt::register_nbt_stat;
-use self::playerstats::register_playerstats;
 use crate::player::Player;
-use prometheus::Registry;
+use crate::prometheus_handler::nbt::register_nbt_stats;
+use playerstats::register_playerstats;
 
 mod nbt;
 mod playerstats;
+mod stat_cache;
 
-pub fn track_for_player(player: &Player, registry: &Registry) {
-    register_playerstats(player, registry);
-    register_nbt_stat(player, registry);
+pub async fn track_for_player(player: &Player) {
+    register_playerstats(player).await;
+    register_nbt_stats(player).await;
 }
