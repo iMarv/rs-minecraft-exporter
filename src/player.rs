@@ -121,3 +121,15 @@ pub async fn gather_players(base_path: &Path) -> Result<Vec<Player>> {
 
     Ok(result)
 }
+
+#[macro_export]
+macro_rules! mock_player {
+    ($id:expr) => {
+        Player {
+            name: format!("name-{}", $id),
+            nbt_stats: crate::mock_nbt!(),
+            uuid: format!("{}", $id),
+            stats: crate::mock_stats!(),
+        }
+    };
+}
