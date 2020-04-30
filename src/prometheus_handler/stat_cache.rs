@@ -1,9 +1,10 @@
 use crate::{player::Player, stats::StatCategory};
-use prometheus::{default_registry, Counter, Registry};
+use prometheus::{default_registry, Counter, Gauge, Registry};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 
 type CounterCache = HashMap<String, Counter>;
+type GaugeCache = HashMap<String, Gauge>;
 
 lazy_static! {
     static ref STAT_CACHE: StatCache = StatCache::new();
@@ -11,6 +12,7 @@ lazy_static! {
 
 struct StatCache {
     counter_cache: Arc<Mutex<CounterCache>>,
+    gauge_cache: Arc<Mutex<GaugeCache>>,
     registry: &'static Registry,
 }
 
@@ -18,6 +20,7 @@ impl Default for StatCache {
     fn default() -> Self {
         Self {
             counter_cache: Arc::new(Mutex::new(HashMap::new())),
+            gauge_cache: Arc::new(Mutex::new(HashMap::new())),
             registry: default_registry(),
         }
     }
@@ -28,7 +31,7 @@ impl StatCache {
         StatCache::default()
     }
 
-    pub async fn set_stat(
+    pub async fn set_counter(
         &self,
         player: &Player,
         category: &StatCategory,
@@ -39,13 +42,51 @@ impl StatCache {
         counter.inc_by(value - counter.get());
     }
 
-    pub async fn get_counter(
+    pub async fn set_gauge(
+        &self,
+        player: &Player,
+        category_type: &String,
+        category_help: &String,
+        value: f64,
+    ) {
+        self.get_gauge(player, category_type, category_help)
+            .await
+            .set(value);
+    }
+
+    async fn get_gauge(
+        &self,
+        player: &Player,
+        category_name: &String,
+        category_help: &String,
+    ) -> Gauge {
+        let id = gauge_id(player, category_name);
+        let mut gauge_cache = self.gauge_cache.lock().await;
+
+        if !gauge_cache.contains_key(&id) {
+            let labels: HashMap<&str, &String> = labels!(
+                "player" => &player.name,
+            );
+
+            let gauge = Gauge::with_opts(opts!(category_name, category_help, labels)).unwrap();
+
+            self.registry
+                .register(Box::new(gauge.clone()))
+                .expect("Stat got registered twice. This should not happen.");
+
+            gauge_cache.insert(id.clone(), gauge);
+        }
+
+        gauge_cache.get(&id).unwrap().clone()
+    }
+
+    async fn get_counter(
         &self,
         player: &Player,
         category: &StatCategory,
         category_type: &String,
     ) -> Counter {
-        let id = unique_stat_id(player, category, category_type);
+        let id = counter_id(player, category, category_type);
         let mut counter_cache = self.counter_cache.lock().await;
 
         if !counter_cache.contains_key(&id) {
@@ -74,8 +115,12 @@ impl StatCache {
     }
 }
 
-fn unique_stat_id(player: &Player, category: &StatCategory, category_type: &String) -> String {
+fn counter_id(player: &Player, category: &StatCategory, category_type: &String) -> String {
     format!("{}_{}_{}", &player.uuid, category, category_type)
+}
+
+fn gauge_id(player: &Player, category_name: &String) -> String {
+    format!("{}_{}", &player.uuid, category_name)
 }
 
 fn get_category_metadata(category: &StatCategory) -> (String, String) {
@@ -94,25 +139,49 @@ fn get_category_metadata(category: &StatCategory) -> (String, String) {
 mod tests {
     use super::*;
     use crate::mock_player;
-    use prometheus::Registry;
 
-    macro_rules! setup_cache {
+    macro_rules! mock_gauge_cache {
+        () => {
+            mock_gauge_cache!(
+                &mock_player!(999999),
+                &String::from("some_gauge_name"),
+                1337.0
+            )
+        };
+        ($player:expr, $category_name:expr, $value:expr) => {{
+            let id = gauge_id($player, $category_name);
+            let gauge = Gauge::with_opts(opts!(
+                $category_name.clone(),
+                format!("help: {}", $category_name)
+            ))
+            .unwrap();
+            gauge.set($value);
+
+            let mut c = HashMap::new();
+            c.insert(id, gauge);
+
+            Arc::new(Mutex::new(c))
+        }};
+    }
+
+    macro_rules! mock_counter_cache {
+        () => {
+            mock_counter_cache!(
+                &mock_player!(999999),
+                &StatCategory::KilledBy,
+                &String::from("some_type"),
+                10.0
+            )
+        };
         ($player:expr, $stat_category:expr, $category_type:expr, $value:expr) => {{
-            let counter_cache = {
-                let id = unique_stat_id($player, $stat_category, $category_type);
-                let counter = Counter::with_opts(opts!("Testi", "Help")).unwrap();
-                counter.inc_by($value);
+            let id = counter_id($player, $stat_category, $category_type);
+            let counter = Counter::with_opts(opts!("Testi", "Help")).unwrap();
+            counter.inc_by($value);
 
-                let mut c = HashMap::new();
-                c.insert(id, counter);
+            let mut c = HashMap::new();
+            c.insert(id, counter);
 
-                c
-            };
-
-            StatCache {
-                counter_cache: Arc::new(Mutex::new(counter_cache)),
-                registry: default_registry(),
-            }
+            Arc::new(Mutex::new(c))
         }};
     }
 
@@ -130,40 +199,101 @@ mod tests {
         }
     }
 
-    mod set_stat {
+    mod set_gauge {
         use super::*;
 
         #[tokio::test]
         async fn should_update_existing_stat() {
-            let player = &mock_player!(1);
-            let category = &StatCategory::Crafted;
-            let category_type = &String::from("minecraft:test1");
+            let player = mock_player!(1);
+            let category_name = String::from("gauge_name");
+            let category_help = String::from("minimal amount of xp");
             let value = 2.0;
 
-            let cache = setup_cache!(&player, category, category_type, value);
+            let cache = StatCache {
+                gauge_cache: mock_gauge_cache!(&player, &category_name, value),
+                counter_cache: mock_counter_cache!(),
+                registry: default_registry(),
+            };
 
             let value = 5.0;
-            cache.set_stat(player, category, category_type, value).await;
+            cache
+                .set_gauge(&player, &category_name, &category_help, value)
+                .await;
 
-            let actual = cache.get_counter(player, category, category_type).await;
+            let actual = cache
+                .get_gauge(&player, &category_name, &category_help)
+                .await;
 
             assert_eq!(actual.get(), value);
         }
 
         #[tokio::test]
         async fn should_insert_new_stat() {
-            let cache = setup_cache!(
-                &mock_player!(3),
-                &StatCategory::Broken,
-                &String::from("minecraft:testi"),
-                67.0
-            );
+            let player = mock_player!(1);
+            let category_name = String::from("gauge_name");
+            let category_help = String::from("minimal amount of xp");
+            let value = 2.0;
+
+            let cache = StatCache {
+                gauge_cache: mock_gauge_cache!(),
+                counter_cache: mock_counter_cache!(),
+                registry: default_registry(),
+            };
+
+            cache
+                .set_gauge(&player, &category_name, &category_help, value)
+                .await;
+
+            let actual = cache
+                .get_gauge(&player, &category_name, &category_help)
+                .await;
+
+            assert_eq!(actual.get(), value);
+        }
+    }
+
+    mod set_counter {
+        use super::*;
+
+        #[tokio::test]
+        async fn should_update_existing_stat() {
+            let player = mock_player!(1);
+            let category = StatCategory::Crafted;
+            let category_type = String::from("minecraft:test1");
+            let value = 2.0;
+
+            let cache = StatCache {
+                gauge_cache: mock_gauge_cache!(),
+                counter_cache: mock_counter_cache!(&player, &category, &category_type, value),
+                registry: default_registry(),
+            };
+
+            let value = 5.0;
+            cache
+                .set_counter(&player, &category, &category_type, value)
+                .await;
+
+            let actual = cache.get_counter(&player, &category, &category_type).await;
+
+            assert_eq!(actual.get(), value);
+        }
+
+        #[tokio::test]
+        async fn should_insert_new_stat() {
+            let cache = StatCache {
+                gauge_cache: mock_gauge_cache!(),
+                counter_cache: mock_counter_cache!(),
+                registry: default_registry(),
+            };
+
             let player = &mock_player!(1);
             let category = &StatCategory::Crafted;
             let category_type = &String::from("minecraft:test2");
             let value = 2.0;
 
-            cache.set_stat(player, category, category_type, value).await;
+            cache
+                .set_counter(player, category, category_type, value)
+                .await;
 
             let actual = cache.get_counter(player, category, category_type).await;
 
