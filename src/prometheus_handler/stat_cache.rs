@@ -7,10 +7,10 @@ type CounterCache = HashMap<String, Counter>;
 type GaugeCache = HashMap<String, Gauge>;
 
 lazy_static! {
-    static ref STAT_CACHE: StatCache = StatCache::new();
+    pub static ref STAT_CACHE: StatCache = StatCache::new();
 }
 
-struct StatCache {
+pub struct StatCache {
     counter_cache: Arc<Mutex<CounterCache>>,
     gauge_cache: Arc<Mutex<GaugeCache>>,
     registry: &'static Registry,
