@@ -1,5 +1,6 @@
 use crate::player::Player;
 use crate::prometheus_handler::stat_cache::STAT_CACHE;
+use crate::Result;
 
 macro_rules! local_register_gauge {
     // Multiple stats at once
@@ -18,11 +19,11 @@ macro_rules! local_register_gauge {
             &String::from($s_name),
             &String::from($help),
             $val
-        ).await;
+        ).await?;
     };
 }
 
-pub async fn register_nbt_stats(player: &Player) {
+pub async fn register_nbt_stats(player: &Player) -> Result<()> {
     local_register_gauge!(
         player,
         [
@@ -56,4 +57,6 @@ pub async fn register_nbt_stats(player: &Player) {
             player.nbt_stats.food_level
         ]
     );
+
+    Ok(())
 }

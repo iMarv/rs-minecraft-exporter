@@ -1,3 +1,4 @@
+use crate::Result;
 use crate::{player::Player, stats::StatCategory};
 use prometheus::{default_registry, Counter, Gauge, Registry};
 use std::{collections::HashMap, sync::Arc};
@@ -28,6 +29,7 @@ impl Default for StatCache {
 
 impl StatCache {
     pub fn new() -> Self {
+        trace!("Initialize stat cache");
         StatCache::default()
     }
 
@@ -37,9 +39,11 @@ impl StatCache {
         category: &StatCategory,
         category_type: &String,
         value: f64,
-    ) {
-        let counter = self.get_counter(player, category, category_type).await;
+    ) -> Result<()> {
+        let counter = self.get_counter(player, category, category_type).await?;
         counter.inc_by(value - counter.get());
+
+        Ok(())
     }
 
     pub async fn set_gauge(
@@ -48,10 +52,12 @@ impl StatCache {
         category_type: &String,
         category_help: &String,
         value: f64,
-    ) {
+    ) -> Result<()> {
         self.get_gauge(player, category_type, category_help)
-            .await
+            .await?
             .set(value);
+
+        Ok(())
     }
 
     async fn get_gauge(
@@ -59,7 +65,7 @@ impl StatCache {
         player: &Player,
         category_name: &String,
         category_help: &String,
-    ) -> Gauge {
+    ) -> Result<Gauge> {
         let id = gauge_id(player, category_name);
         let mut gauge_cache = self.gauge_cache.lock().await;
 
@@ -68,16 +74,14 @@ impl StatCache {
                 "player" => &player.name,
             );
 
-            let gauge = Gauge::with_opts(opts!(category_name, category_help, labels)).unwrap();
+            let gauge = Gauge::with_opts(opts!(category_name, category_help, labels))?;
 
-            self.registry
-                .register(Box::new(gauge.clone()))
-                .expect("Stat got registered twice. This should not happen.");
+            self.registry.register(Box::new(gauge.clone()))?;
 
             gauge_cache.insert(id.clone(), gauge);
         }
 
-        gauge_cache.get(&id).unwrap().clone()
+        Ok(gauge_cache.get(&id).unwrap().clone())
     }
 
     async fn get_counter(
@@ -85,7 +89,7 @@ impl StatCache {
         player: &Player,
         category: &StatCategory,
         category_type: &String,
-    ) -> Counter {
+    ) -> Result<Counter> {
         let id = counter_id(player, category, category_type);
         let mut counter_cache = self.counter_cache.lock().await;
 
@@ -101,17 +105,14 @@ impl StatCache {
                 &String::from(&category_name),
                 &String::from(&category_help),
                 labels
-            ))
-            .unwrap();
+            ))?;
 
-            self.registry
-                .register(Box::new(counter.clone()))
-                .expect("Stat got registered twice. This should not happen.");
+            self.registry.register(Box::new(counter.clone()))?;
 
             counter_cache.insert(id.clone(), counter);
         }
 
-        counter_cache.get(&id).unwrap().clone()
+        Ok(counter_cache.get(&id).unwrap().clone())
     }
 }
 
@@ -218,11 +219,13 @@ mod tests {
             let value = 5.0;
             cache
                 .set_gauge(&player, &category_name, &category_help, value)
-                .await;
+                .await
+                .unwrap();
 
             let actual = cache
                 .get_gauge(&player, &category_name, &category_help)
-                .await;
+                .await
+                .unwrap();
 
             assert_eq!(actual.get(), value);
         }
@@ -242,11 +245,13 @@ mod tests {
 
             cache
                 .set_gauge(&player, &category_name, &category_help, value)
-                .await;
+                .await
+                .unwrap();
 
             let actual = cache
                 .get_gauge(&player, &category_name, &category_help)
-                .await;
+                .await
+                .unwrap();
 
             assert_eq!(actual.get(), value);
         }
@@ -271,9 +276,13 @@ mod tests {
             let value = 5.0;
             cache
                 .set_counter(&player, &category, &category_type, value)
-                .await;
+                .await
+                .unwrap();
 
-            let actual = cache.get_counter(&player, &category, &category_type).await;
+            let actual = cache
+                .get_counter(&player, &category, &category_type)
+                .await
+                .unwrap();
 
             assert_eq!(actual.get(), value);
         }
@@ -293,9 +302,13 @@ mod tests {
 
             cache
                 .set_counter(player, category, category_type, value)
-                .await;
+                .await
+                .unwrap();
 
-            let actual = cache.get_counter(player, category, category_type).await;
+            let actual = cache
+                .get_counter(player, category, category_type)
+                .await
+                .unwrap();
 
             assert_eq!(actual.get(), value);
         }
