@@ -22,7 +22,7 @@ macro_rules! local_register_gauge {
     };
 }
 
-pub async fn register_nbt_stat(player: &Player) {
+pub async fn register_nbt_stats(player: &Player) {
     local_register_gauge!(
         player,
         [
