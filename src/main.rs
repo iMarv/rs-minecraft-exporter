@@ -126,7 +126,7 @@ async fn gather_metrics(path: &Path) -> Result<()> {
     let players = gather_players(path).await?;
 
     for player in &players {
-        track_for_player(&player).await;
+        track_for_player(&player).await?;
     }
 
     Ok(())
