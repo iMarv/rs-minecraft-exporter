@@ -12,7 +12,9 @@ use std::{
     net::{IpAddr, SocketAddr},
     path::{Path, PathBuf},
     str::FromStr,
+    time::Duration,
 };
+use tokio::time;
 
 #[macro_use]
 extern crate log;
@@ -40,20 +42,25 @@ async fn main() -> Result<()> {
     let ip = env::var("HOST_IP").unwrap_or(String::from("0.0.0.0"));
     let addr = (ip.parse::<IpAddr>()?, 8000).into();
 
-    run_server(addr, path).await
+    tokio::spawn(async move {
+        loop {
+            trace!("Scraping player Metrics ...");
+            if let Err(e) = gather_metrics(&path).await {
+                error!("Scraping error: {}", e);
+            }
+
+            time::delay_for(Duration::from_secs(5)).await;
+        }
+    });
+
+    run_server(addr).await
 }
 
-async fn run_server(addr: SocketAddr, path: PathBuf) -> Result<()> {
+async fn run_server(addr: SocketAddr) -> Result<()> {
     info!("Listening on http://{}", addr);
 
-    let make_svc = make_service_fn(move |_| {
-        let path = path.clone();
-        async move {
-            Ok::<_, hyper::Error>(service_fn(move |_req| {
-                let path = path.clone();
-                async move { serve_req(path.as_path()).await }
-            }))
-        }
+    let make_svc = make_service_fn(move |_| async move {
+        Ok::<_, hyper::Error>(service_fn(move |_req| async move { serve_req().await }))
     });
 
     // Then bind and serve...
@@ -93,33 +100,16 @@ fn check_path(path: String) -> Result<PathBuf> {
     }
 }
 
-async fn serve_req(path: &Path) -> std::result::Result<Response<Body>, hyper::Error> {
-    let response = match gather_metrics(path).await {
-        Ok(_) => {
-            // Gather the metrics.
-            let mut buffer = vec![];
-            let encoder = TextEncoder::new();
-            let metric_families = gather();
-            encoder.encode(&metric_families, &mut buffer).unwrap();
+async fn serve_req() -> std::result::Result<Response<Body>, hyper::http::Error> {
+    let mut buffer = vec![];
+    let encoder = TextEncoder::new();
+    let metric_families = gather();
+    encoder.encode(&metric_families, &mut buffer).unwrap();
 
-            Response::builder()
-                .status(200)
-                .header(CONTENT_TYPE, encoder.format_type())
-                .body(Body::from(buffer))
-                .unwrap()
-        }
-        Err(e) => {
-            error!("{}", e);
-
-            Response::builder()
-                .status(500)
-                .header(CONTENT_TYPE, "text/html")
-                .body(Body::from(format!("{}", e)))
-                .unwrap()
-        }
-    };
-
-    Ok(response)
+    Response::builder()
+        .status(200)
+        .header(CONTENT_TYPE, encoder.format_type())
+        .body(Body::from(buffer))
 }
 
 async fn gather_metrics(path: &Path) -> Result<()> {
