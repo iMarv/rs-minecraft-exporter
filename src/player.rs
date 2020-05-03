@@ -93,10 +93,19 @@ async fn fetch_from_mojang(uuid: &String) -> Result<String> {
 pub async fn gather_players(base_path: &Path) -> Result<Vec<Player>> {
     let stats_path = base_path.join(Path::new("stats"));
 
+    if !stats_path.exists() {
+        return Err("Target directory does not contain a stats folder".into());
+    }
+
     let playerdata = {
         let p = base_path.join(Path::new("playerdata"));
+        if !p.exists() {
+            return Err("Target directory does not contain a playerdata folder".into());
+        }
+
         fs::read_dir(p)?
     };
+
     let mut result: Vec<Player> = vec![];
 
     for entry in playerdata {

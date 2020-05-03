@@ -14,7 +14,7 @@ use std::{
     str::FromStr,
     time::Duration,
 };
-use tokio::time;
+use tokio::{time, try_join};
 
 #[macro_use]
 extern crate log;
@@ -42,18 +42,30 @@ async fn main() -> Result<()> {
     let ip = env::var("HOST_IP").unwrap_or(String::from("0.0.0.0"));
     let addr = (ip.parse::<IpAddr>()?, 8000).into();
 
-    tokio::spawn(async move {
+    let scrape = tokio::spawn(async move {
         loop {
             trace!("Scraping player Metrics ...");
             if let Err(e) = gather_metrics(&path).await {
                 error!("Scraping error: {}", e);
+                panic!("Scrape broken, terminating...");
             }
 
             time::delay_for(Duration::from_secs(5)).await;
         }
     });
 
-    run_server(addr).await
+    let server = tokio::spawn(async move {
+        if let Err(e) = run_server(addr).await {
+            error!("server error: {}", e);
+            panic!("server broken, terminating...");
+        }
+    });
+
+    if let Err(e) = try_join!(scrape, server) {
+        Err(e.into())
+    } else {
+        Ok(())
+    }
 }
 
 async fn run_server(addr: SocketAddr) -> Result<()> {
@@ -64,13 +76,10 @@ async fn run_server(addr: SocketAddr) -> Result<()> {
     });
 
     // Then bind and serve...
-    let server = Server::bind(&addr).serve(make_svc);
-
-    if let Err(err) = server.await {
-        error!("server error: {}", err);
-    }
-
-    Ok(())
+    Server::bind(&addr)
+        .serve(make_svc)
+        .await
+        .map_err(|e| e.into())
 }
 
 fn handle_args(args: Vec<String>) -> Result<(PathBuf, log::Level)> {
